@@ -447,6 +447,13 @@ public abstract class BaseLivyInterpreter extends Interpreter {
             .build();
         SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
         HttpClientBuilder httpClientBuilder = HttpClients.custom().setSSLSocketFactory(csf);
+        RequestConfig reqConfig = new RequestConfig() {
+          @Override
+          public boolean isAuthenticationEnabled() {
+            return true;
+          }
+        };
+        httpClientBuilder.setDefaultRequestConfig(reqConfig);
         Credentials credentials = new Credentials() {
           @Override
           public String getPassword() {
@@ -458,24 +465,9 @@ public abstract class BaseLivyInterpreter extends Interpreter {
             return null;
           }
         };
-
-        RequestConfig reqConfig = new RequestConfig() {
-          @Override
-          public boolean isAuthenticationEnabled() {
-            return true;
-          }
-        };
-
         CredentialsProvider credsProvider = new BasicCredentialsProvider();
         credsProvider.setCredentials(AuthScope.ANY, credentials);
-        httpClientBuilder
-            .disableAutomaticRetries()
-//            .setConnectionManager(new BasicHttpClientConnectionManager())
-            .setDefaultRequestConfig(reqConfig)
-            .setConnectionReuseStrategy(new NoConnectionReuseStrategy())
-            .setMaxConnTotal(1)
-            .setDefaultCredentialsProvider(credsProvider)
-            .setUserAgent("livy-client-http");
+        httpClientBuilder.setDefaultCredentialsProvider(credsProvider);
         if (isSpnegoEnabled) {
           Registry<AuthSchemeProvider> authSchemeProviderRegistry =
               RegistryBuilder.<AuthSchemeProvider>create()
