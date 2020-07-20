@@ -308,6 +308,9 @@ public class NotebookServer extends WebSocketServlet
         case GET_NOTE:
           getNote(conn, messagereceived);
           break;
+        case RELOAD_NOTE:
+          getNote(conn, messagereceived);
+          break;
         case NEW_NOTE:
           createNote(conn, messagereceived);
           break;
@@ -827,6 +830,23 @@ public class NotebookServer extends WebSocketServlet
         });
   }
 
+  private void reloadNote(NotebookSocket conn, Message fromMessage) throws IOException {
+    String noteId = (String) fromMessage.get("id");
+    if (noteId == null) {
+      return;
+    }
+    getNotebookService().getNote(noteId, getServiceContext(fromMessage),
+            new WebSocketServiceCallback<Note>(conn) {
+              @Override
+              public void onSuccess(Note note, ServiceContext context) throws IOException {
+                getConnectionManager().addNoteConnection(note.getId(), conn);
+                conn.send(serializeMessage(new Message(OP.NOTE).put("note", note)));
+                updateAngularObjectRegistry(conn, note);
+                sendAllAngularObjects(note, context.getAutheInfo().getUser(), conn);
+              }
+            });
+  }
+
   /**
    * Update the AngularObject object in the note to InterpreterGroup and AngularObjectRegistry.
    */
@@ -1210,7 +1230,7 @@ public class NotebookServer extends WebSocketServlet
       noteJson = new JupyterUtil().getJson(
               gson.toJson(fromMessage.get("note")), IdHashes.generateId(), "%python", "%md");
     }
-    Note note = getNotebookService().importNote(noteName, noteJson, getServiceContext(fromMessage),
+    Note note = getNotebookService().importNote(noteName, noteJson, false, getServiceContext(fromMessage),
         new WebSocketServiceCallback<Note>(conn) {
           @Override
           public void onSuccess(Note note, ServiceContext context) throws IOException {
