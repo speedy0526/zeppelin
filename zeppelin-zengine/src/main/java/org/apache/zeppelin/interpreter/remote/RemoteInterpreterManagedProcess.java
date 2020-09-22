@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.ExecuteException;
 import org.apache.hadoop.yarn.util.ConverterUtils;
+import org.apache.zeppelin.conf.ZeppelinConfiguration;
 import org.apache.zeppelin.interpreter.YarnAppMonitor;
 import org.apache.zeppelin.interpreter.util.ProcessLauncher;
 import org.slf4j.Logger;
@@ -161,6 +162,11 @@ public class RemoteInterpreterManagedProcess extends RemoteInterpreterProcess {
     this.host = host;
     // for yarn cluster it may be transitioned from COMPLETED to RUNNING.
     interpreterProcessLauncher.onProcessRunning();
+
+    callRemoteFunction(client -> {
+      client.init(ZeppelinConfiguration.create().getProperties());
+      return null;
+    });
   }
 
   // called when remote interpreter process is stopped, e.g. YarnAppsMonitor will call this

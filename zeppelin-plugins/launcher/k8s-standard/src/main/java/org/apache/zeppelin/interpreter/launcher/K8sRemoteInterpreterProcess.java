@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.zeppelin.conf.ZeppelinConfiguration;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterProcess;
 import org.apache.zeppelin.interpreter.remote.RemoteInterpreterUtils;
 import org.slf4j.Logger;
@@ -434,6 +435,11 @@ public class K8sRemoteInterpreterProcess extends RemoteInterpreterProcess {
       started.set(true);
       started.notifyAll();
     }
+
+    callRemoteFunction(client -> {
+      client.init(ZeppelinConfiguration.create().getProperties());
+      return null;
+    });
   }
 
   @Override

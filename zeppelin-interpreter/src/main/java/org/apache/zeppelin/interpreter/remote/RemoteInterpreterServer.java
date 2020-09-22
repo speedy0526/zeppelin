@@ -97,6 +97,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.zeppelin.cluster.meta.ClusterMetaType.INTP_PROCESS_META;
 
@@ -145,9 +146,9 @@ public class RemoteInterpreterServer extends Thread
   private ScheduledExecutorService resultCleanService = Executors.newSingleThreadScheduledExecutor();
 
   private boolean isTest;
-
+  
+  private ZeppelinConfiguration zConf;
   // cluster manager client
-  private ZeppelinConfiguration zConf = ZeppelinConfiguration.create();
   private ClusterManagerClient clusterManagerClient;
 
   public RemoteInterpreterServer(String intpEventServerHost,
@@ -192,12 +193,6 @@ public class RemoteInterpreterServer extends Thread
         new TThreadPoolServer.Args(serverTransport).processor(processor));
     remoteWorksResponsePool = Collections.synchronizedMap(new HashMap<String, Object>());
 
-    if (zConf.isClusterMode()) {
-      clusterManagerClient = ClusterManagerClient.getInstance(zConf);
-      clusterManagerClient.start(interpreterGroupId);
-    }
-
-    lifecycleManager = createLifecycleManager();
   }
 
   @Override
@@ -216,27 +211,19 @@ public class RemoteInterpreterServer extends Thread
             }
           }
 
-          if (zConf.isClusterMode()) {
-            // Cluster mode, discovering interpreter processes through metadata registration
-            // TODO (Xun): Unified use of cluster metadata for process discovery of all operating modes
-            // 1. Can optimize the startup logic of the process
-            // 2. Can solve the problem that running the interpreter's IP in docker may be a virtual IP
-            putClusterMeta();
-          } else {
-            if (!interrupted) {
-              RegisterInfo registerInfo = new RegisterInfo(host, port, interpreterGroupId);
+          if (!interrupted) {
+            RegisterInfo registerInfo = new RegisterInfo(host, port, interpreterGroupId);
+            try {
+              LOGGER.info("Registering interpreter process");
+              intpEventClient.registerInterpreterProcess(registerInfo);
+              LOGGER.info("Registered interpreter process");
+              lifecycleManager.onInterpreterProcessStarted(interpreterGroupId);
+            } catch (Exception e) {
+              LOGGER.error("Error while registering interpreter: {}", registerInfo, e);
               try {
-                LOGGER.info("Registering interpreter process");
-                intpEventClient.registerInterpreterProcess(registerInfo);
-                LOGGER.info("Registered interpreter process");
-                lifecycleManager.onInterpreterProcessStarted(interpreterGroupId);
-              } catch (Exception e) {
-                LOGGER.error("Error while registering interpreter: {}", registerInfo, e);
-                try {
-                  shutdown();
-                } catch (TException e1) {
-                  LOGGER.warn("Exception occurs while shutting down", e1);
-                }
+                shutdown();
+              } catch (TException e1) {
+                LOGGER.warn("Exception occurs while shutting down", e1);
               }
             }
           }
@@ -264,6 +251,31 @@ public class RemoteInterpreterServer extends Thread
       }).start();
     }
     server.serve();
+  }
+
+  @Override
+  public void init(Map<String, String> properties) throws TException {
+    this.zConf = new ZeppelinConfiguration();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      this.zConf.setProperty(entry.getKey(), entry.getValue());
+    }
+
+    if (zConf.isClusterMode()) {
+      clusterManagerClient = ClusterManagerClient.getInstance(zConf);
+      clusterManagerClient.start(interpreterGroupId);
+
+      // Cluster mode, discovering interpreter processes through metadata registration
+      // TODO (Xun): Unified use of cluster metadata for process discovery of all operating modes
+      // 1. Can optimize the startup logic of the process
+      // 2. Can solve the problem that running the interpreter's IP in docker may be a virtual IP
+      putClusterMeta();
+    }
+
+    try {
+      lifecycleManager = createLifecycleManager();
+    } catch (Exception e) {
+      throw new TException("Fail to create LifeCycleManager", e);
+    }
   }
 
   @Override
@@ -337,6 +349,14 @@ public class RemoteInterpreterServer extends Thread
     }, "Shutdown-Thread");
 
     shutDownThread.start();
+  }
+
+  public ZeppelinConfiguration getConf() {
+    return this.zConf;
+  }
+
+  public LifecycleManager getLifecycleManager() {
+    return this.lifecycleManager;
   }
 
   public int getPort() {

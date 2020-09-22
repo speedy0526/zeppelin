@@ -287,6 +287,11 @@ public class DockerInterpreterProcess extends RemoteInterpreterProcess {
       dockerStarted.set(true);
       dockerStarted.notify();
     }
+
+    callRemoteFunction(client -> {
+      client.init(ZeppelinConfiguration.create().getProperties());
+      return null;
+    });
   }
 
   @VisibleForTesting

@@ -184,6 +184,10 @@ public class ZeppelinConfiguration extends XMLConfiguration {
     return conf;
   }
 
+  public Map<String, String> getProperties() {
+    return this.properties;
+  }
+
   public static void reset() {
     conf = null;
   }

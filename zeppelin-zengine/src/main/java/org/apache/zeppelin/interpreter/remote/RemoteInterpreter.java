@@ -123,6 +123,7 @@ public class RemoteInterpreter extends Interpreter {
           try {
             if (!(interpreter instanceof ConfInterpreter)) {
               ((RemoteInterpreter) interpreter).internal_create();
+              ((RemoteInterpreter) interpreter).internal_create();
             }
           } catch (IOException e) {
             throw new InterpreterException(e);

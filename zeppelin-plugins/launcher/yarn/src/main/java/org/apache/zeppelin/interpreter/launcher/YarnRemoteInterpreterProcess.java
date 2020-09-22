@@ -147,6 +147,11 @@ public class YarnRemoteInterpreterProcess extends RemoteInterpreterProcess {
   public void processStarted(int port, String host) {
     this.port = port;
     this.host = host;
+
+    callRemoteFunction(client -> {
+      client.init(ZeppelinConfiguration.create().getProperties());
+      return null;
+    });
   }
 
   @Override
@@ -197,7 +202,6 @@ public class YarnRemoteInterpreterProcess extends RemoteInterpreterProcess {
                 + ", diagnostics=" + appReport.getDiagnostics());
       }
       isYarnAppRunning.set(true);
-
     } catch (Exception e) {
       LOGGER.error("Fail to launch yarn interpreter process", e);
       throw new IOException(e);
